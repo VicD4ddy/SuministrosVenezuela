@@ -14,44 +14,55 @@ interface CentroCardProps {
 
 export function CentroCard({ centro }: CentroCardProps) {
   const [votosLocal, setVotosLocal] = useState<Record<string, 'vigente' | 'no_vigente'>>({});
+  const [votosIniciales, setVotosIniciales] = useState<Record<string, 'vigente' | 'no_vigente'>>({});
   const [votando, setVotando] = useState<Record<string, boolean>>({});
   const [verSpam, setVerSpam] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem('suministros_sos_votos');
-      if (stored) setVotosLocal(JSON.parse(stored));
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setVotosLocal(parsed);
+        setVotosIniciales(parsed);
+      }
     } catch { /* silenciar */ }
   }, []);
 
   const handleVotar = async (necesidadId: string, tipoVoto: 'vigente' | 'no_vigente') => {
-    if (votosLocal[necesidadId] || votando[necesidadId]) return;
+    if (votando[necesidadId]) return;
     setVotando(prev => ({ ...prev, [necesidadId]: true }));
 
     const ejecutarVoto = async () => {
-      const nuevosVotos = { ...votosLocal, [necesidadId]: tipoVoto };
+      const esRetractar = votosLocal[necesidadId] === tipoVoto;
+      const nuevosVotos = { ...votosLocal };
+      if (esRetractar) {
+        delete nuevosVotos[necesidadId];
+      } else {
+        nuevosVotos[necesidadId] = tipoVoto;
+      }
       setVotosLocal(nuevosVotos);
       localStorage.setItem('suministros_sos_votos', JSON.stringify(nuevosVotos));
 
       try {
         const fp = generarFingerprint();
-        const rpcName = tipoVoto === 'vigente' ? 'votar_necesidad_vigente' : 'votar_necesidad_no_vigente';
-        const { data, error } = await supabase.rpc(rpcName, { p_necesidad_id: necesidadId, p_fingerprint: fp });
+        const { error } = await supabase.rpc('votar_necesidad_toggle', {
+          p_necesidad_id: necesidadId,
+          p_fingerprint: fp,
+          p_tipo_voto: tipoVoto
+        });
 
         if (error) {
           console.warn('Error al registrar voto:', error.message || error.code || JSON.stringify(error));
-          const { [necesidadId]: _, ...revertido } = nuevosVotos;
-          setVotosLocal(revertido);
-          localStorage.setItem('suministros_sos_votos', JSON.stringify(revertido));
+          setVotosLocal(votosLocal);
+          localStorage.setItem('suministros_sos_votos', JSON.stringify(votosLocal));
         } else {
           vibrar(100);
-          if (data === false) {
-            // Voto duplicado detectado por el servidor
-            console.info('Voto duplicado detectado por rate-limiting del servidor.');
-          }
         }
       } catch (err) {
         console.error('Error de red en votación:', err);
+        setVotosLocal(votosLocal);
+        localStorage.setItem('suministros_sos_votos', JSON.stringify(votosLocal));
       } finally {
         setVotando(prev => ({ ...prev, [necesidadId]: false }));
       }
@@ -126,11 +137,25 @@ export function CentroCard({ centro }: CentroCardProps) {
             </p>
           ) : (
             necesidadesFiltradas.map((necesidad) => {
-              const score = necesidad.votos_vigente - (2 * necesidad.votos_no_vigente);
-              const esSpam = score <= -3 || necesidad.votos_no_vigente >= 3;
-              const yaVotoV = votosLocal[necesidad.id] === 'vigente';
-              const yaVotoNV = votosLocal[necesidad.id] === 'no_vigente';
-              const haVotado = yaVotoV || yaVotoNV;
+              const votoInicial = votosIniciales[necesidad.id];
+              const votoActual = votosLocal[necesidad.id];
+
+              let extraV = 0;
+              if (votoInicial === 'vigente' && votoActual !== 'vigente') extraV = -1;
+              else if (votoInicial !== 'vigente' && votoActual === 'vigente') extraV = 1;
+
+              let extraNV = 0;
+              if (votoInicial === 'no_vigente' && votoActual !== 'no_vigente') extraNV = -1;
+              else if (votoInicial !== 'no_vigente' && votoActual === 'no_vigente') extraNV = 1;
+
+              const votosVigenteMostrados = Math.max(0, necesidad.votos_vigente + extraV);
+              const votosNoVigenteMostrados = Math.max(0, necesidad.votos_no_vigente + extraNV);
+
+              const yaVotoV = votoActual === 'vigente';
+              const yaVotoNV = votoActual === 'no_vigente';
+
+              const score = votosVigenteMostrados - (2 * votosNoVigenteMostrados);
+              const esSpam = score <= -3 || votosNoVigenteMostrados >= 3;
               const oculto = esSpam && !verSpam[necesidad.id];
 
               return (
@@ -161,15 +186,15 @@ export function CentroCard({ centro }: CentroCardProps) {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2.5 border-t border-gray-50">
                         <span className="text-[11px] text-gray-500 font-semibold">¿Sigue vigente?</span>
                         <div className="flex items-center gap-2" role="group" aria-label="Votar vigencia del reporte">
-                          <button onClick={() => handleVotar(necesidad.id, 'vigente')} disabled={haVotado || votando[necesidad.id]}
+                          <button onClick={() => handleVotar(necesidad.id, 'vigente')} disabled={votando[necesidad.id]}
                             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${yaVotoV ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50 active:scale-95'} disabled:cursor-not-allowed`}
-                            aria-label={`Votar que sí sigue vigente (${necesidad.votos_vigente + (yaVotoV ? 1 : 0)} votos)`} aria-pressed={yaVotoV}>
-                            <ThumbsUp className="w-3.5 h-3.5" />Sí ({necesidad.votos_vigente + (yaVotoV ? 1 : 0)})
+                            aria-label={`Votar que sí sigue vigente (${votosVigenteMostrados} votos)`} aria-pressed={yaVotoV}>
+                            <ThumbsUp className="w-3.5 h-3.5" />Sí ({votosVigenteMostrados})
                           </button>
-                          <button onClick={() => handleVotar(necesidad.id, 'no_vigente')} disabled={haVotado || votando[necesidad.id]}
+                          <button onClick={() => handleVotar(necesidad.id, 'no_vigente')} disabled={votando[necesidad.id]}
                             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${yaVotoNV ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-700 border-red-200 hover:bg-red-50 active:scale-95'} disabled:cursor-not-allowed`}
-                            aria-label={`Votar que no sigue vigente (${necesidad.votos_no_vigente + (yaVotoNV ? 1 : 0)} votos)`} aria-pressed={yaVotoNV}>
-                            <ThumbsDown className="w-3.5 h-3.5" />No ({necesidad.votos_no_vigente + (yaVotoNV ? 1 : 0)})
+                            aria-label={`Votar que no sigue vigente (${votosNoVigenteMostrados} votos)`} aria-pressed={yaVotoNV}>
+                            <ThumbsDown className="w-3.5 h-3.5" />No ({votosNoVigenteMostrados})
                           </button>
                         </div>
                       </div>

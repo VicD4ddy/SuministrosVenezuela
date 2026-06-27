@@ -140,41 +140,62 @@ CREATE POLICY "Permitir inserción pública de votos" ON votos_registro
 -- 7. FUNCIONES ALMACENADAS RPC PARA VOTACIONES CON RATE-LIMITING
 -- Ahora reciben un fingerprint y solo incrementan si el voto es nuevo
 
-CREATE OR REPLACE FUNCTION votar_necesidad_vigente(p_necesidad_id UUID, p_fingerprint TEXT)
-RETURNS BOOLEAN AS $$
+CREATE OR REPLACE FUNCTION votar_necesidad_toggle(p_necesidad_id UUID, p_fingerprint TEXT, p_tipo_voto TEXT)
+RETURNS TEXT AS $$
+DECLARE
+    v_voto_existente TEXT;
 BEGIN
-    -- Intentar registrar el voto. Si ya existe (UNIQUE violation), no hacer nada.
-    INSERT INTO votos_registro (necesidad_id, voter_fingerprint, tipo_voto)
-    VALUES (p_necesidad_id, p_fingerprint, 'vigente')
-    ON CONFLICT (necesidad_id, voter_fingerprint) DO NOTHING;
-    
-    -- Si se insertó (voto nuevo), incrementar el conteo
-    IF FOUND THEN
-        UPDATE necesidades
-        SET votos_vigente = votos_vigente + 1
-        WHERE id = p_necesidad_id;
-        RETURN true;
-    END IF;
-    
-    RETURN false; -- Voto duplicado, no se contabilizó
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+    -- 1. Buscar si ya existe un voto del mismo dispositivo por esta necesidad
+    SELECT tipo_voto INTO v_voto_existente
+    FROM votos_registro
+    WHERE necesidad_id = p_necesidad_id AND voter_fingerprint = p_fingerprint;
 
-CREATE OR REPLACE FUNCTION votar_necesidad_no_vigente(p_necesidad_id UUID, p_fingerprint TEXT)
-RETURNS BOOLEAN AS $$
-BEGIN
-    INSERT INTO votos_registro (necesidad_id, voter_fingerprint, tipo_voto)
-    VALUES (p_necesidad_id, p_fingerprint, 'no_vigente')
-    ON CONFLICT (necesidad_id, voter_fingerprint) DO NOTHING;
-    
-    IF FOUND THEN
-        UPDATE necesidades
-        SET votos_no_vigente = votos_no_vigente + 1
-        WHERE id = p_necesidad_id;
-        RETURN true;
+    -- Caso A: No hay voto anterior -> Insertar nuevo voto
+    IF v_voto_existente IS NULL THEN
+        INSERT INTO votos_registro (necesidad_id, voter_fingerprint, tipo_voto)
+        VALUES (p_necesidad_id, p_fingerprint, p_tipo_voto);
+
+        IF p_tipo_voto = 'vigente' THEN
+            UPDATE necesidades SET votos_vigente = votos_vigente + 1 WHERE id = p_necesidad_id;
+        ELSE
+            UPDATE necesidades SET votos_no_vigente = votos_no_vigente + 1 WHERE id = p_necesidad_id;
+        END IF;
+        
+        RETURN 'creado';
+
+    -- Caso B: Click en la misma opción -> Desmarcar/Eliminar voto (Retractar)
+    ELSIF v_voto_existente = p_tipo_voto THEN
+        DELETE FROM votos_registro
+        WHERE necesidad_id = p_necesidad_id AND voter_fingerprint = p_fingerprint;
+
+        IF p_tipo_voto = 'vigente' THEN
+            UPDATE necesidades SET votos_vigente = GREATEST(0, votos_vigente - 1) WHERE id = p_necesidad_id;
+        ELSE
+            UPDATE necesidades SET votos_no_vigente = GREATEST(0, votos_no_vigente - 1) WHERE id = p_necesidad_id;
+        END IF;
+
+        RETURN 'eliminado';
+
+    -- Caso C: Click en la opción contraria -> Alternar voto (Switch)
+    ELSE
+        UPDATE votos_registro
+        SET tipo_voto = p_tipo_voto
+        WHERE necesidad_id = p_necesidad_id AND voter_fingerprint = p_fingerprint;
+
+        IF p_tipo_voto = 'vigente' THEN
+            UPDATE necesidades
+            SET votos_vigente = votos_vigente + 1,
+                votos_no_vigente = GREATEST(0, votos_no_vigente - 1)
+            WHERE id = p_necesidad_id;
+        ELSE
+            UPDATE necesidades
+            SET votos_no_vigente = votos_no_vigente + 1,
+                votos_vigente = GREATEST(0, votos_vigente - 1)
+            WHERE id = p_necesidad_id;
+        END IF;
+
+        RETURN 'alternado';
     END IF;
-    
-    RETURN false;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

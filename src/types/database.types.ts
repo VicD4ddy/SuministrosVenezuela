@@ -182,13 +182,9 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
-      votar_necesidad_vigente: {
-        Args: { p_necesidad_id: string; p_fingerprint: string };
-        Returns: boolean;
-      };
-      votar_necesidad_no_vigente: {
-        Args: { p_necesidad_id: string; p_fingerprint: string };
-        Returns: boolean;
+      votar_necesidad_toggle: {
+        Args: { p_necesidad_id: string; p_fingerprint: string; p_tipo_voto: string };
+        Returns: string;
       };
     };
     Enums: {

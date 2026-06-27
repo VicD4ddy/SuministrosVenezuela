@@ -28,7 +28,7 @@ interface TabReportarProps {
 }
 
 export function TabReportar({ isAdmin, isOnline, centros, onEncolar, onTabChange, refetch }: TabReportarProps) {
-  const [mode, setMode] = useState<'rapido' | 'nuevo' | 'existente'>('rapido');
+  const [mode, setMode] = useState<'nuevo' | 'existente'>('nuevo');
   const [centroExistenteId, setCentroExistenteId] = useState('');
   const [busquedaCentro, setBusquedaCentro] = useState('');
 
@@ -38,6 +38,18 @@ export function TabReportar({ isAdmin, isOnline, centros, onEncolar, onTabChange
   const [direccionReporte, setDireccionReporte] = useState('');
 
   const { latitud, longitud, gpsLoading, gpsReady, gpsError, detectarUbicacion, resetGps } = useGeolocation();
+  const [latitudCentro, setLatitudCentro] = useState<number | null>(null);
+  const [longitudCentro, setLongitudCentro] = useState<number | null>(null);
+  const [ubicacionFijada, setUbicacionFijada] = useState(false);
+
+  useEffect(() => {
+    if (gpsReady && latitud && longitud) {
+      setLatitudCentro(latitud);
+      setLongitudCentro(longitud);
+      setUbicacionFijada(true);
+    }
+  }, [gpsReady, latitud, longitud]);
+
   const { L, isReady: leafletReady } = useLeaflet();
   const miniMapRef = useRef<any>(null);
   const miniMapContainerRef = useRef<HTMLDivElement>(null);
@@ -58,29 +70,44 @@ export function TabReportar({ isAdmin, isOnline, centros, onEncolar, onTabChange
   const [submitSuccess, setSubmitSuccess] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // Mini mapa
+  // Mini mapa interactivo
   useEffect(() => {
-    if (!leafletReady || !L || !gpsReady || !latitud || !longitud || !miniMapContainerRef.current) {
+    if (!leafletReady || !L || !miniMapContainerRef.current) {
       if (miniMapRef.current) { miniMapRef.current.remove(); miniMapRef.current = null; }
       return;
     }
 
     if (miniMapRef.current) { miniMapRef.current.remove(); miniMapRef.current = null; }
 
-    const map = L.map(miniMapContainerRef.current, { zoomControl: false }).setView([latitud, longitud], 15);
+    const latInicial = latitudCentro || 10.4806;
+    const lngInicial = longitudCentro || -66.9036;
+    const zoomInicial = latitudCentro ? 15 : 6;
+
+    const map = L.map(miniMapContainerRef.current, { zoomControl: true }).setView([latInicial, lngInicial], zoomInicial);
     miniMapRef.current = map;
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM' }).addTo(map);
 
-    const userIcon = L.divIcon({
-      html: `<div style="background-color: #3b82f6; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.35);"></div>`,
-      className: 'custom-user-pin', iconSize: [14, 14], iconAnchor: [7, 7],
+    let marker: any = null;
+    if (latitudCentro && longitudCentro) {
+      const pinIcon = L.divIcon({
+        html: `<div style="background-color: #ef4444; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.35);"></div>`,
+        className: 'custom-center-pin', iconSize: [14, 14], iconAnchor: [7, 7],
+      });
+      marker = L.marker([latitudCentro, longitudCentro], { icon: pinIcon }).addTo(map)
+        .bindPopup('<b style="font-size:11px;">Ubicación seleccionada</b>').openPopup();
+    }
+
+    map.on('click', (e: any) => {
+      const { lat, lng } = e.latlng;
+      setLatitudCentro(lat);
+      setLongitudCentro(lng);
+      setUbicacionFijada(true);
+      vibrar(50);
     });
 
-    L.marker([latitud, longitud], { icon: userIcon }).addTo(map).bindPopup('<b style="font-size:11px;">Tu ubicación</b>').openPopup();
-
     return () => { if (miniMapRef.current) { miniMapRef.current.remove(); miniMapRef.current = null; } };
-  }, [leafletReady, L, gpsReady, latitud, longitud]);
+  }, [leafletReady, L, latitudCentro, longitudCentro]);
 
   const centrosFiltrados = centros.filter(c =>
     busquedaCentro === '' ||
@@ -88,19 +115,8 @@ export function TabReportar({ isAdmin, isOnline, centros, onEncolar, onTabChange
     c.municipio.toLowerCase().includes(busquedaCentro.toLowerCase())
   );
 
-  // Auto-detect GPS cuando se activa modo rápido
-  const handleSetMode = (m: 'rapido' | 'nuevo' | 'existente') => {
-    setMode(m);
-    if (m === 'rapido' && !gpsReady && !gpsLoading) {
-      detectarUbicacion();
-    }
-  };
-
   const handlePreSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (mode === 'rapido' && !nombreCentro.trim()) {
-      setSubmitError('Ingrese el nombre del lugar.'); return;
-    }
     if (mode === 'nuevo' && (!nombreCentro.trim() || !municipioReporte.trim() || !direccionReporte.trim())) {
       setSubmitError('Complete todos los campos del centro.'); return;
     }
@@ -110,7 +126,7 @@ export function TabReportar({ isAdmin, isOnline, centros, onEncolar, onTabChange
     if (categoriasSeleccionadas.length === 0) {
       setSubmitError('Seleccione al menos un tipo de suministro.'); return;
     }
-    if (mode !== 'rapido' && (!cantidadRequerida.trim() || !descripcionNecesidad.trim())) {
+    if (!cantidadRequerida.trim() || !descripcionNecesidad.trim()) {
       setSubmitError('Complete la cantidad y descripción de la necesidad.'); return;
     }
     setSubmitError('');
@@ -159,12 +175,12 @@ export function TabReportar({ isAdmin, isOnline, centros, onEncolar, onTabChange
       for (const cat of categoriasSeleccionadas) {
         const ok = onEncolar({
           nombreCentro: nombreCentro.trim(),
-          estado: mode === 'rapido' ? 'Sin especificar' : estadoReporte,
-          municipio: mode === 'rapido' ? 'Sin especificar' : municipioReporte.trim(),
-          direccion: mode === 'rapido' ? 'Reportado vía modo rápido' : direccionReporte.trim(),
-          latitud, longitud, categoria: cat,
-          descripcion: descripcionNecesidad.trim() || 'Reporte rápido de emergencia',
-          cantidad: cantidadRequerida.trim() || 'Urgente',
+          estado: estadoReporte,
+          municipio: municipioReporte.trim(),
+          direccion: direccionReporte.trim(),
+          latitud: latitudCentro, longitud: longitudCentro, categoria: cat,
+          descripcion: descripcionNecesidad.trim(),
+          cantidad: cantidadRequerida.trim(),
           urgencia: urgenciaSeleccionada, verificado: isAdmin,
         });
         if (!ok) { allOk = false; break; }
@@ -179,13 +195,13 @@ export function TabReportar({ isAdmin, isOnline, centros, onEncolar, onTabChange
 
     try {
       const estatus: EstatusCentro = urgenciaSeleccionada === 'critico' ? 'critico' : urgenciaSeleccionada === 'parcial' ? 'parcial' : 'surtido';
-      const coords = latitud && longitud ? `(${longitud},${latitud})` : null;
+      const coords = latitudCentro && longitudCentro ? `(${longitudCentro},${latitudCentro})` : null;
 
       const { data: centroData, error: cErr } = await supabase.from('centros_acopio').insert({
         nombre: nombreCentro.trim(),
-        estado: mode === 'rapido' ? 'Sin especificar' : estadoReporte,
-        municipio: mode === 'rapido' ? 'Sin especificar' : municipioReporte.trim(),
-        direccion: mode === 'rapido' ? 'Reportado vía modo rápido' : direccionReporte.trim(),
+        estado: estadoReporte,
+        municipio: municipioReporte.trim(),
+        direccion: direccionReporte.trim(),
         coordenadas: coords, estatus_general: estatus,
         verificado: isAdmin, creado_por: null,
       }).select().single();
@@ -193,8 +209,8 @@ export function TabReportar({ isAdmin, isOnline, centros, onEncolar, onTabChange
 
       const necesidadesRows = categoriasSeleccionadas.map(cat => ({
         centro_id: centroData.id, categoria: cat,
-        descripcion: descripcionNecesidad.trim() || 'Reporte rápido de emergencia',
-        cantidad_requerida: cantidadRequerida.trim() || 'Urgente',
+        descripcion: descripcionNecesidad.trim(),
+        cantidad_requerida: cantidadRequerida.trim(),
         estatus: 'pendiente' as const, urgencia: urgenciaSeleccionada, votos_no_vigente: 0, votos_vigente: 0,
       }));
       const { error: nErr } = await supabase.from('necesidades').insert(necesidadesRows);
@@ -214,6 +230,7 @@ export function TabReportar({ isAdmin, isOnline, centros, onEncolar, onTabChange
     setNombreCentro(''); setMunicipioReporte(''); setDireccionReporte('');
     setCategoriasSeleccionadas(['agua_hidratacion']);
     setCantidadRequerida(''); setDescripcionNecesidad(''); resetGps();
+    setLatitudCentro(null); setLongitudCentro(null); setUbicacionFijada(false);
   };
 
   return (
@@ -223,22 +240,17 @@ export function TabReportar({ isAdmin, isOnline, centros, onEncolar, onTabChange
         <p className="text-xs text-gray-500 mt-1">Proporcione detalles para coordinar asistencia.</p>
       </div>
 
-      {/* Selector de modo — Rápido primero para emergencia */}
-      <div className="flex gap-1.5" role="group" aria-label="Tipo de reporte">
-        <button type="button" onClick={() => handleSetMode('rapido')}
-          className={`flex-1 py-2.5 text-xs font-bold rounded-lg border transition-all ${mode === 'rapido' ? 'bg-red-700 text-white border-red-700 shadow-md' : 'bg-white text-red-700 border-red-200 hover:bg-red-50'}`}
-          aria-pressed={mode === 'rapido'}>
-          <Siren className="w-3.5 h-3.5 inline mr-1" />Rápido 🚨
-        </button>
-        <button type="button" onClick={() => handleSetMode('nuevo')}
-          className={`flex-1 py-2.5 text-xs font-bold rounded-lg border transition-all ${mode === 'nuevo' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
+      {/* Selector de modo */}
+      <div className="flex gap-2" role="group" aria-label="Tipo de reporte">
+        <button type="button" onClick={() => setMode('nuevo')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-all ${mode === 'nuevo' ? 'bg-gray-900 text-white border-gray-900 shadow-sm' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
           aria-pressed={mode === 'nuevo'}>
-          <PlusCircle className="w-3.5 h-3.5 inline mr-1" />Detallado
+          <PlusCircle className="w-3.5 h-3.5 inline mr-1" />Centro Nuevo
         </button>
-        <button type="button" onClick={() => handleSetMode('existente')}
-          className={`flex-1 py-2.5 text-xs font-bold rounded-lg border transition-all ${mode === 'existente' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
+        <button type="button" onClick={() => setMode('existente')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-all ${mode === 'existente' ? 'bg-gray-900 text-white border-gray-900 shadow-sm' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
           aria-pressed={mode === 'existente'}>
-          <Search className="w-3.5 h-3.5 inline mr-1" />Existente
+          <Search className="w-3.5 h-3.5 inline mr-1" />Agregar a Existente
         </button>
       </div>
 
@@ -246,35 +258,7 @@ export function TabReportar({ isAdmin, isOnline, centros, onEncolar, onTabChange
         {submitError && <div className="p-3 bg-red-50 text-red-800 text-xs border border-red-200 rounded-lg flex items-center gap-1.5" role="alert"><AlertTriangle className="w-4 h-4 text-red-600 shrink-0" /><span className="font-semibold">{submitError}</span></div>}
         {submitSuccess && <div className="p-3 bg-emerald-50 text-emerald-800 text-xs border border-emerald-200 rounded-lg flex items-center gap-1.5" role="alert"><CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" /><span className="font-semibold">{submitSuccess}</span></div>}
 
-        {mode === 'rapido' ? (
-          /* MODO RÁPIDO: Solo nombre + GPS automático */
-          <div className="space-y-3">
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-800 font-semibold flex items-center gap-1.5">
-              <Siren className="w-4 h-4 text-red-600 shrink-0" />
-              <span>Modo emergencia — solo ingrese el nombre del lugar. GPS detectado automáticamente.</span>
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="nombre-rapido" className="block text-xs font-bold text-gray-600 uppercase">Nombre del Lugar *</label>
-              <input id="nombre-rapido" type="text" placeholder="Ej. Liceo Bolívar, Casa comunal..." value={nombreCentro} onChange={e => setNombreCentro(e.target.value)}
-                className="w-full px-3 py-3 text-base bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 font-bold text-gray-800" required autoFocus />
-            </div>
-            {gpsReady && latitud && longitud ? (
-              <div className="flex items-center text-emerald-700 text-xs font-bold gap-1 bg-emerald-50 p-2 rounded-lg border border-emerald-100">
-                <CheckCircle className="w-4 h-4 shrink-0" /><span>📍 GPS detectado automáticamente</span>
-              </div>
-            ) : gpsLoading ? (
-              <div className="flex items-center text-blue-700 text-xs font-bold gap-1.5 bg-blue-50 p-2 rounded-lg border border-blue-100">
-                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /><span>Detectando ubicación GPS...</span>
-              </div>
-            ) : (
-              <button type="button" onClick={detectarUbicacion}
-                className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-lg border border-gray-200 flex items-center justify-center gap-1.5"
-                aria-label="Detectar ubicación GPS">
-                <MapPin className="w-3.5 h-3.5 text-gray-600" />DETECTAR GPS (Opcional)
-              </button>
-            )}
-          </div>
-        ) : mode === 'existente' ? (
+        {mode === 'existente' ? (
           <div className="space-y-2">
             <label htmlFor="buscar-centro" className="block text-xs font-bold text-gray-600 uppercase">Buscar Centro Existente *</label>
             <input id="buscar-centro" type="text" placeholder="Buscar por nombre o municipio..." value={busquedaCentro} onChange={e => setBusquedaCentro(e.target.value)}
@@ -318,23 +302,42 @@ export function TabReportar({ isAdmin, isOnline, centros, onEncolar, onTabChange
             </div>
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-gray-600 uppercase">Ubicación GPS (Opcional)</label>
-              <button type="button" onClick={detectarUbicacion} disabled={gpsLoading}
-                className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-lg border border-gray-200 flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
-                aria-label="Detectar ubicación GPS actual">
-                <MapPin className="w-3.5 h-3.5 text-gray-600" />{gpsLoading ? 'Detectando...' : 'DETECTAR MI UBICACIÓN'}
-              </button>
+              <div className="flex gap-2">
+                <button type="button" onClick={detectarUbicacion} disabled={gpsLoading}
+                  className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-lg border border-gray-200 flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
+                  aria-label="Detectar ubicación GPS actual">
+                  <MapPin className="w-3.5 h-3.5 text-gray-600" />{gpsLoading ? 'Detectando...' : 'DETECTAR MI UBICACIÓN'}
+                </button>
+                {ubicacionFijada && (
+                  <button type="button" onClick={() => { setLatitudCentro(null); setLongitudCentro(null); setUbicacionFijada(false); resetGps(); }}
+                    className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-lg border border-red-200"
+                    aria-label="Borrar ubicación del mapa">
+                    BORRAR PIN
+                  </button>
+                )}
+              </div>
               {gpsError && <p className="text-red-600 text-[10px] font-bold" role="alert">{gpsError}</p>}
-              <div className="relative h-32 rounded-lg overflow-hidden border border-gray-200">
-                {gpsReady && latitud && longitud ? (
+              
+              <p className="text-[10px] font-medium text-gray-500">
+                💡 Toca cualquier parte del mapa para fijar o ajustar manualmente el pin.
+              </p>
+
+              <div className="relative h-36 rounded-lg overflow-hidden border border-gray-200">
+                {leafletReady ? (
                   <div ref={miniMapContainerRef} style={{ height: '100%', width: '100%' }} />
                 ) : (
                   <div className="h-full bg-gray-100 border border-dashed border-gray-300 flex flex-col items-center justify-center p-2">
                     <MapPin className="w-6 h-6 text-gray-400 mb-1 animate-bounce" aria-hidden="true" />
-                    <span className="text-[10px] font-bold text-gray-500 bg-white/80 px-2 py-0.5 rounded shadow-sm border border-gray-100">Detectar GPS para ver mapa</span>
+                    <span className="text-[10px] font-bold text-gray-500 bg-white/80 px-2 py-0.5 rounded shadow-sm border border-gray-100">Cargando mapa interactivo...</span>
                   </div>
                 )}
               </div>
-              {gpsReady && <div className="flex items-center text-emerald-700 text-xs font-bold gap-1"><CheckCircle className="w-3.5 h-3.5 shrink-0" /><span>Ubicación fijada</span></div>}
+              {ubicacionFijada && (
+                <div className="flex items-center text-emerald-700 text-xs font-bold gap-1 bg-emerald-50 p-1.5 rounded-lg border border-emerald-100">
+                  <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Ubicación seleccionada ({latitudCentro?.toFixed(4)}, {longitudCentro?.toFixed(4)})</span>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -418,22 +421,18 @@ export function TabReportar({ isAdmin, isOnline, centros, onEncolar, onTabChange
           ))}
         </div>
 
-        {/* Campos de detalle — ocultos en modo rápido */}
-        {mode !== 'rapido' && (
-          <>
-            <div className="space-y-1">
-              <label htmlFor="cantidad" className="block text-xs font-bold text-gray-600 uppercase">Cantidad Necesitada *</label>
-              <input id="cantidad" type="text" placeholder="Ej. 200 litros, para 50 familias..." value={cantidadRequerida} onChange={e => setCantidadRequerida(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 font-medium text-gray-800" required />
-            </div>
+        {/* Campos de detalle */}
+        <div className="space-y-1">
+          <label htmlFor="cantidad" className="block text-xs font-bold text-gray-600 uppercase">Cantidad Necesitada *</label>
+          <input id="cantidad" type="text" placeholder="Ej. 200 litros, para 50 familias..." value={cantidadRequerida} onChange={e => setCantidadRequerida(e.target.value)}
+            className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 font-medium text-gray-800" required />
+        </div>
 
-            <div className="space-y-1">
-              <label htmlFor="descripcion" className="block text-xs font-bold text-gray-600 uppercase">Detalle Adicional *</label>
-              <textarea id="descripcion" placeholder="Descripción del suministro necesario..." value={descripcionNecesidad} onChange={e => setDescripcionNecesidad(e.target.value)} rows={3}
-                className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 font-medium text-gray-800 resize-none" required />
-            </div>
-          </>
-        )}
+        <div className="space-y-1">
+          <label htmlFor="descripcion" className="block text-xs font-bold text-gray-600 uppercase">Detalle Adicional *</label>
+          <textarea id="descripcion" placeholder="Descripción del suministro necesario..." value={descripcionNecesidad} onChange={e => setDescripcionNecesidad(e.target.value)} rows={3}
+            className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 font-medium text-gray-800 resize-none" required />
+        </div>
 
         {isAdmin && (
           <div className="p-2.5 bg-blue-50 text-blue-900 border border-blue-200 rounded-lg text-xs font-semibold flex items-center gap-1.5">
