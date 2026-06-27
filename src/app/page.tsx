@@ -7,6 +7,7 @@ import { useOfflineSync } from '../hooks/useOfflineSync';
 import { useOledDark } from '../hooks/useOledDark';
 import { useAuth } from '../hooks/useAuth';
 import { getCategoriaLabel } from '../lib/categorias';
+import { obtenerEstadoPorCoordenadas } from '../lib/geo';
 
 import { Header } from '../components/Header';
 import { BottomNav, TabId } from '../components/BottomNav';
@@ -35,6 +36,23 @@ export default function SuministrosApp() {
       navigator.serviceWorker.register('/sw.js')
         .then((reg) => console.log('💚 SW registrado:', reg.scope))
         .catch((err) => console.error('🛑 SW falló:', err));
+    }
+  }, []);
+
+  // Auto-detectar ubicación al abrir la app para fijar el estado por defecto
+  useEffect(() => {
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const estado = obtenerEstadoPorCoordenadas(pos.coords.latitude, pos.coords.longitude);
+          console.log(`📍 Ubicación detectada. Configurando filtro por defecto a: ${estado}`);
+          setEstadoFiltro(estado);
+        },
+        (err) => {
+          console.warn('⚠️ No se pudo obtener la ubicación para el filtro inicial de estado:', err.message);
+        },
+        { timeout: 8000 }
+      );
     }
   }, []);
 
