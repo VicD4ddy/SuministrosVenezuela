@@ -35,14 +35,19 @@ export function TabSuministros({
   return (
     <div className="space-y-4" role="tabpanel" id="panel-suministros" aria-label="Lista de suministros">
       {/* Botón Reportar — PRIMERO: acción más urgente en emergencia */}
-      <button
-        onClick={() => onTabChange('reportar')}
-        className="w-full py-3.5 bg-red-700 hover:bg-red-800 text-white font-bold text-sm rounded-xl shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all"
-        aria-label="Reportar una nueva necesidad o centro de acopio"
-      >
-        <PlusCircle className="w-5 h-5 shrink-0" />
-        REPORTAR NECESIDAD / CENTRO
-      </button>
+      <div className="space-y-1.5 text-center">
+        <button
+          onClick={() => onTabChange('reportar')}
+          className="w-full py-3.5 bg-red-700 hover:bg-red-800 text-white font-bold text-sm rounded-xl shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all"
+          aria-label="Reportar una nueva necesidad o centro de acopio"
+        >
+          <PlusCircle className="w-5 h-5 shrink-0" />
+          REPORTAR NECESIDAD / CENTRO
+        </button>
+        <p className="text-[10px] text-gray-500 font-medium leading-normal px-2">
+          Al reportar una necesidad o centro de acopio te volverás coordinador de dicha zona y los que quieran ayudarte se pondrán en contacto contigo.
+        </p>
+      </div>
 
       {/* Filtros rápidos de urgencia */}
       <div className="flex gap-2" role="group" aria-label="Filtros de urgencia">

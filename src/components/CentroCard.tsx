@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { MapPin, Check, ThumbsUp, ThumbsDown, AlertTriangle, Award, Eye, EyeOff, Share2, Phone, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { MapPin, Check, ThumbsUp, ThumbsDown, AlertTriangle, Award, Eye, EyeOff, Share2, Phone, X, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { CentroAcopioConDetalles } from '../types/database.types';
 import { supabase } from '../lib/supabaseClient';
 import { obtenerLatLng, calcularDistanciaKm, generarFingerprint, formatRelativeTime } from '../lib/geo';
@@ -65,6 +65,36 @@ export function CentroCard({ centro, refetch }: CentroCardProps) {
       refetch();
     } catch (err) {
       console.error('Error al cambiar estatus del centro:', err);
+    }
+  };
+
+  const handleEliminarCentro = async () => {
+    const ok = window.confirm(`⚠️ ¿Estás seguro de que deseas eliminar por completo este refugio (${centro.nombre}) y todas sus necesidades reportadas?\n\nEsta acción es permanente y no se puede deshacer.`);
+    if (!ok) return;
+
+    try {
+      // 1. Borrar necesidades del centro primero para evitar conflictos de claves externas (FK)
+      const { error: errNecesidades } = await supabase
+        .from('necesidades')
+        .delete()
+        .eq('centro_id', centro.id);
+      
+      if (errNecesidades) throw errNecesidades;
+
+      // 2. Borrar el centro de acopio
+      const { error: errCentro } = await supabase
+        .from('centros_acopio')
+        .delete()
+        .eq('id', centro.id);
+
+      if (errCentro) throw errCentro;
+
+      vibrar(300);
+      alert('🗑️ El refugio y sus necesidades han sido eliminados correctamente.');
+      refetch();
+    } catch (err: any) {
+      console.error('Error al eliminar refugio:', err);
+      alert(`🛑 Error al eliminar: ${err.message || 'Error de conexión'}`);
     }
   };
 
@@ -430,6 +460,16 @@ export function CentroCard({ centro, refetch }: CentroCardProps) {
                       ✅ ESTABLE
                     </button>
                   </div>
+
+                  {/* Botón de Borrado del Refugio */}
+                  <button
+                    type="button"
+                    onClick={handleEliminarCentro}
+                    className="w-full mt-2 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-[10px] font-extrabold rounded-lg flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-sm"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    ELIMINAR REFUGIO / CENTRO
+                  </button>
                 </div>
               )}
 
