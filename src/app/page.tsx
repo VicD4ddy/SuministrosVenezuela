@@ -28,7 +28,7 @@ export default function SuministrosApp() {
   const { centros, loading, error, refetch } = useRealtimeCentros();
   const { isOnline, colaOffline, sincronizando, syncAlert, procesarCola, encolarReporte } = useOfflineSync(refetch);
   const { oledDark, toggleOledDark } = useOledDark();
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   // Registrar Service Worker solo en producción
   useEffect(() => {
@@ -56,7 +56,7 @@ export default function SuministrosApp() {
     }
   }, []);
 
-  // Filtrar centros
+  // Filtrar y ordenar centros
   const centrosFiltrados = centros.filter((centro) => {
     const matchEstado = estadoFiltro === 'todos' || centro.estado.toLowerCase() === estadoFiltro.toLowerCase();
     const matchUrgencia = urgenciaFiltro === 'todos' || centro.estatus_general === urgenciaFiltro;
@@ -70,6 +70,12 @@ export default function SuministrosApp() {
         getCategoriaLabel(n.categoria).toLowerCase().includes(q)
       );
     return matchEstado && matchUrgencia && matchSearch;
+  }).sort((a, b) => {
+    const isACoordinator = user && a.creado_por === user?.id;
+    const isBCoordinator = user && b.creado_por === user?.id;
+    if (isACoordinator && !isBCoordinator) return -1;
+    if (!isACoordinator && isBCoordinator) return 1;
+    return 0; // Mantener el orden original de Supabase (por urgencia/fecha)
   });
 
   return (
