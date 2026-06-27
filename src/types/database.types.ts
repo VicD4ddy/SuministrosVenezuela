@@ -183,11 +183,11 @@ export interface Database {
     };
     Functions: {
       votar_necesidad_vigente: {
-        Args: { necesidad_id: string; fingerprint: string };
+        Args: { p_necesidad_id: string; p_fingerprint: string };
         Returns: boolean;
       };
       votar_necesidad_no_vigente: {
-        Args: { necesidad_id: string; fingerprint: string };
+        Args: { p_necesidad_id: string; p_fingerprint: string };
         Returns: boolean;
       };
     };

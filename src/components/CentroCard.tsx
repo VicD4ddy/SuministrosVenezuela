@@ -36,7 +36,7 @@ export function CentroCard({ centro }: CentroCardProps) {
       try {
         const fp = generarFingerprint();
         const rpcName = tipoVoto === 'vigente' ? 'votar_necesidad_vigente' : 'votar_necesidad_no_vigente';
-        const { data, error } = await supabase.rpc(rpcName, { necesidad_id: necesidadId, fingerprint: fp });
+        const { data, error } = await supabase.rpc(rpcName, { p_necesidad_id: necesidadId, p_fingerprint: fp });
 
         if (error) {
           console.warn('Error al registrar voto:', error.message || error.code || JSON.stringify(error));
