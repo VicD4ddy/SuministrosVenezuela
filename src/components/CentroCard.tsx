@@ -98,6 +98,28 @@ export function CentroCard({ centro, refetch }: CentroCardProps) {
     }
   };
 
+  const handleCambiarTelefono = async () => {
+    const nuevoTelefono = window.prompt("Ingrese el número de teléfono con WhatsApp (con código de operadora, ej. 04141234567) del nuevo responsable:", centro.telefono_contacto || '');
+    if (nuevoTelefono === null) return;
+    if (nuevoTelefono.trim().length < 10) {
+      alert('⚠️ Por favor ingrese un número de teléfono válido.');
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('centros_acopio')
+        .update({ telefono_contacto: nuevoTelefono.trim() })
+        .eq('id', centro.id);
+      if (error) throw error;
+      vibrar(200);
+      alert('✅ Teléfono de contacto actualizado. Ahora los voluntarios se comunicarán con el nuevo responsable.');
+      refetch();
+    } catch (err: any) {
+      console.error('Error al cambiar teléfono:', err);
+      alert(`🛑 Error al actualizar: ${err.message || 'Error de conexión'}`);
+    }
+  };
+
   // Extraer todos los teléfonos únicos del coordinador y colaboradores de las necesidades
   const telefonosColaboradores = React.useMemo(() => {
     const telefonos = new Set<string>();
@@ -479,6 +501,16 @@ export function CentroCard({ centro, refetch }: CentroCardProps) {
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     ELIMINAR REFUGIO / CENTRO
+                  </button>
+
+                  {/* Botón de Delegar Teléfono */}
+                  <button
+                    type="button"
+                    onClick={handleCambiarTelefono}
+                    className="w-full mt-2 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-[10px] font-extrabold rounded-lg flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-sm"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    DELEGAR RESPONSABLE / TELÉFONO
                   </button>
                 </div>
               )}

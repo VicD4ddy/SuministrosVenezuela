@@ -105,6 +105,10 @@ export interface Database {
           verificado: boolean;
           creado_por: string | null;
           ultima_actualizacion: string;
+          reportado_por_fingerprint?: string | null;
+          reportado_autenticado?: boolean;
+          gps_verificado?: boolean;
+          telefono_contacto?: string | null;
           mensaje_alerta?: string | null;
         };
         Insert: {
@@ -118,6 +122,10 @@ export interface Database {
           verificado?: boolean;
           creado_por?: string | null;
           ultima_actualizacion?: string;
+          reportado_por_fingerprint?: string | null;
+          reportado_autenticado?: boolean;
+          gps_verificado?: boolean;
+          telefono_contacto?: string | null;
           mensaje_alerta?: string | null;
         };
         Update: {
@@ -131,6 +139,10 @@ export interface Database {
           verificado?: boolean;
           creado_por?: string | null;
           ultima_actualizacion?: string;
+          reportado_por_fingerprint?: string | null;
+          reportado_autenticado?: boolean;
+          gps_verificado?: boolean;
+          telefono_contacto?: string | null;
           mensaje_alerta?: string | null;
         };
         Relationships: [];
