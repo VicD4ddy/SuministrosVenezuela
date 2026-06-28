@@ -14,6 +14,9 @@ interface TabSuministrosProps {
   criticosCount: number;
   parcialesCount: number;
   surtidosCount: number;
+  userCoords: { lat: number; lng: number } | null;
+  ordenarPorDistancia: boolean;
+  onOrdenarPorDistanciaChange: (val: boolean) => void;
   onEstadoChange: (estado: string) => void;
   onUrgenciaChange: (urgencia: string) => void;
   onRefetch: () => void;
@@ -30,6 +33,7 @@ const ESTADOS_VENEZUELA = [
 export function TabSuministros({
   centros, loading, error, estadoFiltro, urgenciaFiltro,
   criticosCount, parcialesCount, surtidosCount,
+  userCoords, ordenarPorDistancia, onOrdenarPorDistanciaChange,
   onEstadoChange, onUrgenciaChange, onRefetch, onTabChange,
 }: TabSuministrosProps) {
 
@@ -69,21 +73,44 @@ export function TabSuministros({
         ))}
       </div>
 
-      {/* Selector de Estado — filtro secundario */}
-      <div className="w-full">
-        <select
-          id="filtro-estado"
-          value={estadoFiltro}
-          onChange={(e) => onEstadoChange(e.target.value)}
-          className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 font-semibold text-gray-800 appearance-none"
-          aria-label="Filtrar centros por estado de Venezuela"
-          style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.75rem center', backgroundSize: '1.25rem', backgroundRepeat: 'no-repeat' }}
+      {/* Selector de Estado y Botón de Cercanía GPS */}
+      <div className="flex gap-2 items-center">
+        <div className="flex-1">
+          <select
+            id="filtro-estado"
+            value={estadoFiltro}
+            onChange={(e) => onEstadoChange(e.target.value)}
+            className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 font-semibold text-gray-800 appearance-none"
+            aria-label="Filtrar centros por estado de Venezuela"
+            style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.75rem center', backgroundSize: '1.25rem', backgroundRepeat: 'no-repeat' }}
+          >
+            <option value="todos">📍 Filtrar por Estado</option>
+            {ESTADOS_VENEZUELA.map((estado) => (
+              <option key={estado} value={estado}>{estado}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Toggle Cercanía GPS */}
+        <button
+          type="button"
+          onClick={() => {
+            if (!userCoords) {
+              alert("⚠️ No se ha detectado tu ubicación GPS. Asegúrate de dar permisos de geolocalización a la aplicación.");
+              return;
+            }
+            onOrdenarPorDistanciaChange(!ordenarPorDistancia);
+          }}
+          className={`px-3 py-2.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 shadow-sm active:scale-95 whitespace-nowrap ${
+            ordenarPorDistancia
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+          }`}
+          title={userCoords ? 'Ordenar por cercanía GPS' : 'Active el GPS para ordenar por cercanía'}
         >
-          <option value="todos">📍 Filtrar por Estado</option>
-          {ESTADOS_VENEZUELA.map((estado) => (
-            <option key={estado} value={estado}>{estado}</option>
-          ))}
-        </select>
+          <span>📍 Cercanos</span>
+          {ordenarPorDistancia && <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />}
+        </button>
       </div>
 
       {/* Listado */}
@@ -108,7 +135,7 @@ export function TabSuministros({
       ) : (
         <div className="space-y-4">
           {centros.map((centro) => (
-            <CentroCard key={centro.id} centro={centro} refetch={onRefetch} />
+            <CentroCard key={centro.id} centro={centro} refetch={onRefetch} userCoords={userCoords} />
           ))}
         </div>
       )}

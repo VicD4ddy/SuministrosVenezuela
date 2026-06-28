@@ -7,7 +7,7 @@ import { useOfflineSync } from '../hooks/useOfflineSync';
 import { useOledDark } from '../hooks/useOledDark';
 import { useAuth } from '../hooks/useAuth';
 import { getCategoriaLabel } from '../lib/categorias';
-import { obtenerEstadoPorCoordenadas } from '../lib/geo';
+import { obtenerEstadoPorCoordenadas, calcularDistanciaKm, obtenerLatLng } from '../lib/geo';
 
 import { Header } from '../components/Header';
 import { BottomNav, TabId } from '../components/BottomNav';
@@ -29,6 +29,9 @@ export default function SuministrosApp() {
   const { isOnline, colaOffline, sincronizando, syncAlert, procesarCola, encolarReporte } = useOfflineSync(refetch);
   const { oledDark, toggleOledDark } = useOledDark();
   const { user, isAdmin } = useAuth();
+  
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [ordenarPorDistancia, setOrdenarPorDistancia] = useState(false);
 
   // Registrar Service Worker solo en producción
   useEffect(() => {
@@ -39,7 +42,7 @@ export default function SuministrosApp() {
     }
   }, []);
 
-  // Auto-detectar ubicación al abrir la app para fijar el estado por defecto
+  // Auto-detectar ubicación al abrir la app para fijar el estado por defecto y coordenadas
   useEffect(() => {
     if (typeof window !== 'undefined' && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -47,6 +50,7 @@ export default function SuministrosApp() {
           const estado = obtenerEstadoPorCoordenadas(pos.coords.latitude, pos.coords.longitude);
           console.log(`📍 Ubicación detectada. Configurando filtro por defecto a: ${estado}`);
           setEstadoFiltro(estado);
+          setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         },
         (err) => {
           console.warn('⚠️ No se pudo obtener la ubicación para el filtro inicial de estado:', err.message);
@@ -70,6 +74,17 @@ export default function SuministrosApp() {
       );
     return matchEstado && matchSearch;
   }).sort((a, b) => {
+    if (ordenarPorDistancia && userCoords) {
+      const posA = obtenerLatLng(a.coordenadas);
+      const posB = obtenerLatLng(b.coordenadas);
+      if (posA && !posB) return -1;
+      if (!posA && posB) return 1;
+      if (posA && posB) {
+        const distA = calcularDistanciaKm(userCoords.lat, userCoords.lng, posA[0], posA[1]);
+        const distB = calcularDistanciaKm(userCoords.lat, userCoords.lng, posB[0], posB[1]);
+        return distA - distB;
+      }
+    }
     const isACoordinator = user && a.creado_por === user?.id;
     const isBCoordinator = user && b.creado_por === user?.id;
     if (isACoordinator && !isBCoordinator) return -1;
@@ -116,6 +131,9 @@ export default function SuministrosApp() {
             criticosCount={criticosCount}
             parcialesCount={parcialesCount}
             surtidosCount={surtidosCount}
+            userCoords={userCoords}
+            ordenarPorDistancia={ordenarPorDistancia}
+            onOrdenarPorDistanciaChange={setOrdenarPorDistancia}
             onEstadoChange={setEstadoFiltro}
             onUrgenciaChange={setUrgenciaFiltro}
             onRefetch={refetch}

@@ -13,9 +13,10 @@ import { useAuth } from '../hooks/useAuth';
 interface CentroCardProps {
   centro: CentroAcopioConDetalles;
   refetch: () => void;
+  userCoords?: { lat: number; lng: number } | null;
 }
 
-export function CentroCard({ centro, refetch }: CentroCardProps) {
+export function CentroCard({ centro, refetch, userCoords }: CentroCardProps) {
   const [votosLocal, setVotosLocal] = useState<Record<string, 'vigente' | 'no_vigente'>>({});
   const [votosIniciales, setVotosIniciales] = useState<Record<string, 'vigente' | 'no_vigente'>>({});
   const [votando, setVotando] = useState<Record<string, boolean>>({});
@@ -25,6 +26,13 @@ export function CentroCard({ centro, refetch }: CentroCardProps) {
 
   const { user, isAdmin } = useAuth();
   const esCoordinador = user && (centro.creado_por === user.id || isAdmin);
+
+  const distanciaKm = React.useMemo(() => {
+    if (!userCoords) return null;
+    const pos = obtenerLatLng(centro.coordenadas);
+    if (!pos) return null;
+    return calcularDistanciaKm(userCoords.lat, userCoords.lng, pos[0], pos[1]);
+  }, [centro.coordenadas, userCoords]);
 
   const handleCambiarUrgencia = async (necesidadId: string, nuevaUrgencia: 'critico' | 'parcial' | 'recibiendo') => {
     try {
@@ -269,6 +277,12 @@ export function CentroCard({ centro, refetch }: CentroCardProps) {
           )}
           {centro.gps_verificado && (
             <><span className="text-gray-300 hidden sm:inline">|</span><span className="text-[10px] font-semibold text-indigo-600" title="Ubicación GPS del reportante verificada">📍 Verificado</span></>
+          )}
+          {distanciaKm !== null && (
+            <><span className="text-gray-300 hidden sm:inline">|</span>
+            <span className="text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full whitespace-nowrap animate-fadeIn border border-blue-100" title={`A ${distanciaKm.toFixed(2)} km de tu ubicación`}>
+              📍 a {distanciaKm < 1 ? `${(distanciaKm * 1000).toFixed(0)} m` : `${distanciaKm.toFixed(1)} km`}
+            </span></>
           )}
           {!centro.verificado && !centro.reportado_autenticado && !centro.gps_verificado && (
             <><span className="text-gray-300 hidden sm:inline">|</span><span className="text-[10px] font-medium text-gray-400" title="Reporte anónimo">Anónimo</span></>
