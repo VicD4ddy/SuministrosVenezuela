@@ -320,14 +320,25 @@ export function CentroCard({ centro, refetch, userCoords }: CentroCardProps) {
                   ))}
                 </div>
                 
-                <button
-                  type="button"
-                  onClick={() => setExpandido(true)}
-                  className="w-full mt-2 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1 active:scale-95 transition-all"
-                >
-                  <span>MOSTRAR DETALLES ({necesidadesFiltradas.length})</span>
-                  <ChevronDown className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setExpandido(true)}
+                    className="flex-1 py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1 active:scale-95 transition-all"
+                  >
+                    <span>DETALLES ({necesidadesFiltradas.length})</span>
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowColaborarModal(true)}
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all duration-200"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>CONTACTAR</span>
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -358,100 +369,77 @@ export function CentroCard({ centro, refetch, userCoords }: CentroCardProps) {
                 const oculto = esSpam && !verSpam[necesidad.id];
 
                 return (
-                  <div key={necesidad.id} className={`border border-gray-100 rounded-lg p-3 transition-all ${esSpam ? 'bg-red-50/30 border-red-100/50' : 'bg-white'}`}>
+                  <div key={necesidad.id} className={`border border-gray-100 rounded-lg p-2.5 transition-all ${esSpam ? 'bg-red-50/30 border-red-100/50' : 'bg-white'}`}>
                     {esSpam && (
-                      <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-red-100/30">
-                        <span className="text-[10px] font-bold text-red-700 bg-red-100/60 px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" aria-hidden="true" /> Spam (Score: {score})
+                      <div className="flex justify-between items-center mb-1.5 pb-1 border-b border-red-100/30">
+                        <span className="text-[9px] font-bold text-red-700 bg-red-100/60 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <AlertTriangle className="w-2.5 h-2.5" aria-hidden="true" /> Spam (Score: {score})
                         </span>
                         <button type="button" onClick={() => setVerSpam(prev => ({ ...prev, [necesidad.id]: !prev[necesidad.id] }))}
-                          className="text-[10px] font-bold text-red-800 hover:underline flex items-center gap-1"
+                          className="text-[9px] font-bold text-red-800 hover:underline flex items-center gap-1"
                           aria-label={oculto ? 'Mostrar contenido del reporte' : 'Ocultar reporte'}>
-                          {oculto ? <><Eye className="w-3 h-3" /> Mostrar</> : <><EyeOff className="w-3 h-3" /> Ocultar</>}
+                          {oculto ? <><Eye className="w-2.5 h-2.5" /> Mostrar</> : <><EyeOff className="w-2.5 h-2.5" /> Ocultar</>}
                         </button>
                       </div>
                     )}
 
                     {!oculto ? (
                       <div className="animate-fadeIn">
-                        <div className="flex justify-between items-start gap-2 mb-1.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 border text-xs font-semibold rounded-md ${getUrgenciaStyles(necesidad.urgencia)}`}>
+                        <div className="flex justify-between items-start gap-2 mb-1">
+                          <span className={`inline-flex items-center px-1.5 py-0.5 border text-[10px] font-bold rounded-md ${getUrgenciaStyles(necesidad.urgencia)}`}>
                             {getCategoriaIcon(necesidad.categoria)}
                             {getCategoriaLabel(necesidad.categoria)} - {getUrgenciaLabel(necesidad.urgencia)}
                           </span>
-                          <span className="text-xs font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded">Cant: {necesidad.cantidad_requerida}</span>
+                          <span className="text-[10px] font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded">Cant: {necesidad.cantidad_requerida}</span>
                         </div>
-                        <p className="text-gray-700 text-sm mb-3 font-medium">{necesidad.descripcion}</p>
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2.5 border-t border-gray-50">
-                          <span className="text-[11px] text-gray-500 font-semibold">¿Sigue vigente?</span>
-                          <div className="flex items-center gap-2" role="group" aria-label="Votar vigencia del reporte">
+                        <p className="text-gray-700 text-xs mb-2 font-medium">{necesidad.descripcion}</p>
+                        
+                        {/* Fila de votación compacta */}
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-50">
+                          <span className="text-[10px] text-gray-400 font-bold">¿Sigue vigente?</span>
+                          <div className="flex items-center gap-1.5" role="group" aria-label="Votar vigencia del reporte">
                             <button onClick={() => handleVotar(necesidad.id, 'vigente')} disabled={votando[necesidad.id]}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${yaVotoV ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50 active:scale-95'} disabled:cursor-not-allowed`}
+                              className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all ${yaVotoV ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50 active:scale-95'} disabled:cursor-not-allowed`}
                               aria-label={`Votar que sí sigue vigente (${votosVigenteMostrados} votos)`} aria-pressed={yaVotoV}>
-                              <ThumbsUp className="w-3.5 h-3.5" />Sí ({votosVigenteMostrados})
+                              <ThumbsUp className="w-3 h-3" />Sí ({votosVigenteMostrados})
                             </button>
                             <button onClick={() => handleVotar(necesidad.id, 'no_vigente')} disabled={votando[necesidad.id]}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${yaVotoNV ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-700 border-red-200 hover:bg-red-50 active:scale-95'} disabled:cursor-not-allowed`}
+                              className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all ${yaVotoNV ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-700 border-red-200 hover:bg-red-50 active:scale-95'} disabled:cursor-not-allowed`}
                               aria-label={`Votar que no sigue vigente (${votosNoVigenteMostrados} votos)`} aria-pressed={yaVotoNV}>
-                              <ThumbsDown className="w-3.5 h-3.5" />No ({votosNoVigenteMostrados})
+                              <ThumbsDown className="w-3 h-3" />No ({votosNoVigenteMostrados})
                             </button>
                           </div>
                         </div>
 
-                        {/* Controles de Gestión del Coordinador */}
+                        {/* Controles de Gestión del Coordinador Ultracompactos */}
                         {esCoordinador && (
-                          <div className="mt-3 pt-3 border-t border-gray-50 space-y-2.5 animate-fadeIn">
-                            <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                              Gestión de Coordinador
-                            </span>
-                            <div className="flex flex-wrap items-center justify-between gap-2 bg-gray-50/70 p-2 rounded-xl border border-gray-100/50">
-                              {/* Selector de Urgencia */}
-                              <div className="flex items-center gap-1">
+                          <div className="mt-2 pt-2 border-t border-gray-50 flex items-center justify-between gap-2 bg-gray-50/50 p-1 rounded-lg border border-gray-100/30">
+                            <div className="flex items-center gap-1">
+                              {[
+                                { k: 'critico' as const, l: 'CRÍTICO', c: 'bg-red-600 text-white border-red-600 shadow-sm', i: 'bg-white text-red-700 border-red-200' },
+                                { k: 'parcial' as const, l: 'PARCIAL', c: 'bg-amber-500 text-white border-amber-500 shadow-sm', i: 'bg-white text-amber-700 border-amber-200' },
+                                { k: 'recibiendo' as const, l: 'ESTABLE', c: 'bg-emerald-600 text-white border-emerald-600 shadow-sm', i: 'bg-white text-emerald-700 border-emerald-200' }
+                              ].map(opt => (
                                 <button
+                                  key={opt.k}
                                   type="button"
-                                  onClick={() => handleCambiarUrgencia(necesidad.id, 'critico')}
-                                  className={`px-2 py-1 text-[9px] font-extrabold rounded-lg border transition-all ${
-                                    necesidad.urgencia === 'critico'
-                                      ? 'bg-red-600 text-white border-red-600 shadow-sm'
-                                      : 'bg-white text-red-700 border-red-200 hover:bg-red-50'
+                                  onClick={() => handleCambiarUrgencia(necesidad.id, opt.k)}
+                                  className={`px-1.5 py-0.5 text-[8px] font-extrabold rounded border transition-all ${
+                                    necesidad.urgencia === opt.k ? opt.c : opt.i
                                   }`}
                                 >
-                                  CRÍTICO
+                                  {opt.l}
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCambiarUrgencia(necesidad.id, 'parcial')}
-                                  className={`px-2 py-1 text-[9px] font-extrabold rounded-lg border transition-all ${
-                                    necesidad.urgencia === 'parcial'
-                                      ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                                      : 'bg-white text-amber-700 border-amber-200 hover:bg-amber-50'
-                                  }`}
-                                >
-                                  PARCIAL
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCambiarUrgencia(necesidad.id, 'recibiendo')}
-                                  className={`px-2 py-1 text-[9px] font-extrabold rounded-lg border transition-all ${
-                                    necesidad.urgencia === 'recibiendo'
-                                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                                      : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  ESTABLE
-                                </button>
-                              </div>
-
-                              {/* Botón Marcar Resuelto */}
-                              <button
-                                type="button"
-                                onClick={() => handleMarcarResuelta(necesidad.id)}
-                                className="px-3 py-1 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-800 text-[10px] font-extrabold rounded-lg flex items-center gap-1 active:scale-95 transition-all shadow-sm"
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                                RESUELTO
-                              </button>
+                              ))}
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => handleMarcarResuelta(necesidad.id)}
+                              className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-800 text-[8px] font-extrabold rounded flex items-center gap-0.5 active:scale-95 transition-all shadow-sm"
+                            >
+                              <Check className="w-2.5 h-2.5" />
+                              LISTO
+                            </button>
                           </div>
                         )}
                       </div>
