@@ -345,6 +345,42 @@ export function CentroCard({ centro, refetch, userCoords }: CentroCardProps) {
         ) : (
           /* MODO EXPANDIDO */
           <div className="space-y-3 animate-fadeIn">
+            {(() => {
+              const pos = obtenerLatLng(centro.coordenadas);
+              if (!pos) return null;
+              const lat = pos[0];
+              const lng = pos[1];
+              const bbox = `${lng - 0.003},${lat - 0.002},${lng + 0.003},${lat + 0.002}`;
+              const iframeSrc = `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${lat},${lng}`;
+              const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+              return (
+                <div className="relative rounded-xl overflow-hidden border border-gray-100 shadow-inner h-24 w-full group animate-fadeIn mb-1">
+                  <iframe
+                    title={`Mapa de ${centro.nombre}`}
+                    width="100%"
+                    height="100%"
+                    frameBorder="0"
+                    scrolling="no"
+                    marginHeight={0}
+                    marginWidth={0}
+                    src={iframeSrc}
+                    className="pointer-events-none filter saturate-[0.85] contrast-[0.95]"
+                  />
+                  <a
+                    href={gmapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute inset-0 bg-black/5 hover:bg-black/15 transition-all flex items-center justify-center cursor-pointer"
+                    aria-label="Abrir en Google Maps"
+                  >
+                    <span className="bg-white/95 text-gray-800 font-extrabold text-[9px] tracking-wider uppercase px-2.5 py-1.5 rounded-lg shadow-md border border-gray-100 flex items-center gap-1 active:scale-95 transition-transform backdrop-blur-xs">
+                      📍 ABRIR EN GOOGLE MAPS
+                    </span>
+                  </a>
+                </div>
+              );
+            })()}
+
             <div className="space-y-3">
               {necesidadesFiltradas.map((necesidad) => {
                 const votoInicial = votosIniciales[necesidad.id];
