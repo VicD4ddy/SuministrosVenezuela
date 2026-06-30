@@ -241,7 +241,7 @@ export function TabReportar({ isAdmin, isOnline, centros, onEncolar, onTabChange
     const map = L.map(miniMapContainerRef.current, { zoomControl: true }).setView([latInicial, lngInicial], zoomInicial);
     miniMapRef.current = map;
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM' }).addTo(map);
+    L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { attribution: '&copy; Google Maps' }).addTo(map);
 
     let marker: any = null;
     if (latitudCentro && longitudCentro) {

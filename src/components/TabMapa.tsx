@@ -29,8 +29,8 @@ export function TabMapa({ centros }: TabMapaProps) {
       const map = L.map(containerRef.current).setView([8.5, -66.5], 6);
       mapRef.current = map;
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap',
+      L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        attribution: '&copy; Google Maps',
       }).addTo(map);
 
       markersRef.current = L.layerGroup().addTo(map);
